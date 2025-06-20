@@ -7,28 +7,6 @@
 ![IoT](https://img.shields.io/badge/IoT-Sensors%20Ready-orange.svg)
 ![Bluetooth](https://img.shields.io/badge/Bluetooth-Notifications-blue.svg)
 
-## 🎯 Demo Visiva - Prova il Sistema Subito!
-
-### 🔄 Flusso Operativo del Sistema
-
-```mermaid
-graph TD
-    A[Operatore] --> B[Dashboard]
-    B --> C[Gestione Letti]
-    B --> D[Pazienti]
-    B --> E[Manutenzione]
-    C --> F[Notifiche]
-    D --> F
-    E --> F
-
-### 📊 Statistiche Sistema in Tempo Reale
-
-### 🖼️ Funzionalità Principali
-Dashboard Principale Gestione Letti Sistema Bluetooth Panoramica completa del sistema Visualizzazione 3D dei letti Notifiche automatiche
-
-⚡ Quick Start - Prova in 30 Secondi!
-# Avvia tutto il sistema con un solo comando
-quick_start.bat
 
 
 ## 🎯 Demo Simulazione - Scenario Emergenza Ospedaliera
