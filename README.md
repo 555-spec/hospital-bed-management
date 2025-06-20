@@ -11,7 +11,7 @@
 
 ### 🔄 Flusso Operativo del Sistema
 
-
+```mermaid
 flowchart TD
     A[👨‍⚕️ Operatore Accede] --> B[📊 Dashboard Principale]
     B --> C{Scegli Azione}
@@ -24,8 +24,8 @@ flowchart TD
     G --> J[✅ Operazione Completata]
     H --> J
     I --> J
-
 ### 📊 Statistiche Sistema in Tempo Reale
+
 ### 🖼️ Funzionalità Principali
 Dashboard Principale Gestione Letti Sistema Bluetooth Panoramica completa del sistema Visualizzazione 3D dei letti Notifiche automatiche
 
