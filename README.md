@@ -7,7 +7,7 @@
 ![IoT](https://img.shields.io/badge/IoT-Sensors%20Ready-orange.svg)
 ![Bluetooth](https://img.shields.io/badge/Bluetooth-Notifications-blue.svg)
 
-# 🎯 Demo Visiva - Prova il Sistema Subito!
+## 🎯 Demo Visiva - Prova il Sistema Subito!
 
 ### 🔄 Flusso Operativo del Sistema
 
