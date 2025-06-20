@@ -170,7 +170,7 @@ Sistema avanzato per la gestione intelligente dei letti ospedalieri che combina:
 - **Performance**: Ottimizzazioni per rendering veloce
 - **Accessibilità**: Supporto completo per screen readers
 
-### Architettura Sistema
+### Archittetura di Sistema
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Sensori IoT   │───▶│  Backend Flask  │◀───│ Frontend React  │
 │  (Pressione)    │    │   + Database    │    │   (Dashboard)   │
@@ -181,7 +181,6 @@ Sistema avanzato per la gestione intelligente dei letti ospedalieri che combina:
 │ Sistema Bluetooth│
 │  (Braccialetti) │
 └─────────────────┘
-
 
 
 ## 🗄️ Schema Database
