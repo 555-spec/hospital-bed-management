@@ -16,7 +16,18 @@ database_dir.mkdir(exist_ok=True)
 database_file = database_dir / 'hospital.db'
 
 app = Flask(__name__)
-CORS(app)
+
+# Configurazione CORS migliorata per produzione
+if os.getenv('FLASK_ENV') == 'production':
+    # In produzione, specifica i domini consentiti
+    allowed_origins = [
+        "https://your-frontend-domain.vercel.app",  # Sostituisci con il tuo dominio Vercel
+        "https://your-render-domain.onrender.com",  # Sostituisci con il tuo dominio Render
+    ]
+    CORS(app, origins=allowed_origins)
+else:
+    # In sviluppo, permetti tutti i domini
+    CORS(app)
 
 # Usa DATABASE_URL dal .env se disponibile, altrimenti SQLite
 database_url = os.getenv('DATABASE_URL')
@@ -67,6 +78,93 @@ class Notifica(db.Model):
 # Crea tutte le tabelle
 with app.app_context():
     db.create_all()
+
+# NUOVO ENDPOINT: Inizializza demo con dati di esempio
+@app.route('/api/init-demo', methods=['POST'])
+def init_demo():
+    """Popola il database con dati di esempio per la demo"""
+    try:
+        # Verifica se i dati demo esistono già
+        if PostoLetto.query.count() > 0:
+            return jsonify({'message': 'Demo già inizializzata', 'status': 'already_initialized'}), 200
+        
+        # Crea letti di esempio
+        demo_beds = [
+            # Piano 1 - Pronto Soccorso
+            {'numero': 'PS001', 'stato': 'libero', 'reparto': 'Pronto Soccorso', 'x': 100, 'y': 150, 'z': 0, 'piano': 1},
+            {'numero': 'PS002', 'stato': 'occupato', 'reparto': 'Pronto Soccorso', 'x': 150, 'y': 150, 'z': 0, 'piano': 1},
+            {'numero': 'PS003', 'stato': 'in_pulizia', 'reparto': 'Pronto Soccorso', 'x': 200, 'y': 150, 'z': 0, 'piano': 1},
+            {'numero': 'PS004', 'stato': 'libero', 'reparto': 'Pronto Soccorso', 'x': 250, 'y': 150, 'z': 0, 'piano': 1},
+            
+            # Piano 2 - Cardiologia
+            {'numero': 'CAR001', 'stato': 'occupato', 'reparto': 'Cardiologia', 'x': 100, 'y': 250, 'z': 0, 'piano': 2},
+            {'numero': 'CAR002', 'stato': 'libero', 'reparto': 'Cardiologia', 'x': 150, 'y': 250, 'z': 0, 'piano': 2},
+            {'numero': 'CAR003', 'stato': 'libero', 'reparto': 'Cardiologia', 'x': 200, 'y': 250, 'z': 0, 'piano': 2},
+            
+            # Piano 3 - Pediatria
+            {'numero': 'PED001', 'stato': 'libero', 'reparto': 'Pediatria', 'x': 100, 'y': 350, 'z': 0, 'piano': 3},
+            {'numero': 'PED002', 'stato': 'occupato', 'reparto': 'Pediatria', 'x': 150, 'y': 350, 'z': 0, 'piano': 3},
+            {'numero': 'PED003', 'stato': 'libero', 'reparto': 'Pediatria', 'x': 200, 'y': 350, 'z': 0, 'piano': 3},
+        ]
+        
+        for bed_data in demo_beds:
+            bed = PostoLetto(
+                numero=bed_data['numero'],
+                stato=bed_data['stato'],
+                reparto=bed_data['reparto'],
+                coordinate_x=bed_data['x'],
+                coordinate_y=bed_data['y'],
+                coordinate_z=bed_data['z'],
+                piano=bed_data['piano']
+            )
+            db.session.add(bed)
+        
+        # Crea pazienti di esempio in attesa
+        demo_patients = [
+            {'nome': 'Mario Rossi', 'gravita': 4, 'reparto': 'Cardiologia'},
+            {'nome': 'Anna Bianchi', 'gravita': 2, 'reparto': 'Pediatria'},
+            {'nome': 'Giuseppe Verdi', 'gravita': 5, 'reparto': 'Pronto Soccorso'},
+        ]
+        
+        for patient_data in demo_patients:
+            patient = Paziente(
+                nome=patient_data['nome'],
+                gravita=patient_data['gravita'],
+                reparto_richiesto=patient_data['reparto'],
+                assegnato=False
+            )
+            db.session.add(patient)
+        
+        # Crea alcune notifiche di esempio
+        demo_notifications = [
+            {'bed_id': 3, 'messaggio': 'Letto PS003 richiede pulizia urgente', 'priorita': 'high'},
+            {'bed_id': 1, 'messaggio': 'Letto PS001 pronto per nuovo paziente', 'priorita': 'medium'},
+        ]
+        
+        for notif_data in demo_notifications:
+            notification = Notifica(
+                bed_id=notif_data['bed_id'],
+                messaggio=notif_data['messaggio'],
+                priorita=notif_data['priorita'],
+                consegnata=False
+            )
+            db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Demo inizializzata con successo',
+            'status': 'initialized',
+            'data': {
+                'beds_created': len(demo_beds),
+                'patients_created': len(demo_patients),
+                'notifications_created': len(demo_notifications)
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Inizializzazione demo fallita', 'details': str(e)}), 500
 
 @app.route('/api/sensor_update', methods=['POST'])
 def sensor_update():
@@ -418,81 +516,84 @@ def run_optimization(specific_patient_id=None):
         'assignments': assignments
     }
 
-# Import e inizializzazione dei moduli di manutenzione
-import maintenance_staff
-maintenance_staff.db = db  # Inizializza db nel modulo maintenance_staff
-maintenance_staff.init_models()  # Inizializza i modelli dopo aver impostato db
+# Import e inizializzazione dei moduli di manutenzione (solo se esistono)
+try:
+    import maintenance_staff
+    maintenance_staff.db = db  # Inizializza db nel modulo maintenance_staff
+    maintenance_staff.init_models()  # Inizializza i modelli dopo aver impostato db
 
-import maintenance_api
-maintenance_api.app = app  # Inizializza app nel modulo maintenance_api
-maintenance_api.db = db    # Inizializza db nel modulo maintenance_api
-maintenance_api.PostoLetto = PostoLetto  # Inizializza PostoLetto nel modulo maintenance_api
-maintenance_api.init_routes()  # Inizializza le route dopo aver impostato le variabili
+    import maintenance_api
+    maintenance_api.app = app  # Inizializza app nel modulo maintenance_api
+    maintenance_api.db = db    # Inizializza db nel modulo maintenance_api
+    maintenance_api.PostoLetto = PostoLetto  # Inizializza PostoLetto nel modulo maintenance_api
+    maintenance_api.init_routes()  # Inizializza le route dopo aver impostato le variabili
 
-# Popola il database con personale sanitario OSS e Infermieri se vuoto
-with app.app_context():
-    from maintenance_staff import PersonaleManutenzione
-    if PersonaleManutenzione.query.count() == 0:
-        print("Popolamento database con personale sanitario (OSS e Infermieri)...")
-        
-        personale_sanitario = [
-            # Piano 1 - Pronto Soccorso/Emergenze (9 persone)
-            {"nome": "Marco Rossi", "ruolo": "OSS", "device_id": "OSS001_BT", "x": 120, "y": 180, "piano": 1},
-            {"nome": "Anna Verdi", "ruolo": "Infermiere", "device_id": "INF001_BT", "x": 180, "y": 160, "piano": 1},
-            {"nome": "Giuseppe Bianchi", "ruolo": "OSS", "device_id": "OSS002_BT", "x": 220, "y": 200, "piano": 1},
-            {"nome": "Laura Neri", "ruolo": "Infermiere", "device_id": "INF002_BT", "x": 160, "y": 220, "piano": 1},
-            {"nome": "Francesco Blu", "ruolo": "OSS", "device_id": "OSS003_BT", "x": 200, "y": 140, "piano": 1},
-            {"nome": "Giulia Rosa", "ruolo": "Infermiere", "device_id": "INF003_BT", "x": 140, "y": 200, "piano": 1},
-            {"nome": "Roberto Verde", "ruolo": "OSS", "device_id": "OSS004_BT", "x": 240, "y": 180, "piano": 1},
-            {"nome": "Maria Gialli", "ruolo": "Infermiere", "device_id": "INF004_BT", "x": 200, "y": 240, "piano": 1},
-            {"nome": "Paolo Viola", "ruolo": "Infermiere", "device_id": "INF005_BT", "x": 180, "y": 120, "piano": 1},
+    # Popola il database con personale sanitario OSS e Infermieri se vuoto
+    with app.app_context():
+        from maintenance_staff import PersonaleManutenzione
+        if PersonaleManutenzione.query.count() == 0:
+            print("Popolamento database con personale sanitario (OSS e Infermieri)...")
             
-            # Piano 2 - Reparti Specialistici (9 persone)
-            {"nome": "Elena Arancio", "ruolo": "OSS", "device_id": "OSS005_BT", "x": 150, "y": 280, "piano": 2},
-            {"nome": "Luca Marrone", "ruolo": "Infermiere", "device_id": "INF006_BT", "x": 200, "y": 260, "piano": 2},
-            {"nome": "Sara Grigio", "ruolo": "OSS", "device_id": "OSS006_BT", "x": 180, "y": 300, "piano": 2},
-            {"nome": "Andrea Nero", "ruolo": "Infermiere", "device_id": "INF007_BT", "x": 220, "y": 280, "piano": 2},
-            {"nome": "Chiara Celeste", "ruolo": "OSS", "device_id": "OSS007_BT", "x": 160, "y": 320, "piano": 2},
-            {"nome": "Matteo Oro", "ruolo": "Infermiere", "device_id": "INF008_BT", "x": 240, "y": 300, "piano": 2},
-            {"nome": "Federica Argento", "ruolo": "OSS", "device_id": "OSS008_BT", "x": 140, "y": 260, "piano": 2},
-            {"nome": "Davide Bronzo", "ruolo": "Infermiere", "device_id": "INF009_BT", "x": 200, "y": 320, "piano": 2},
-            {"nome": "Valentina Rame", "ruolo": "Infermiere", "device_id": "INF010_BT", "x": 180, "y": 240, "piano": 2},
+            personale_sanitario = [
+                # Piano 1 - Pronto Soccorso/Emergenze (9 persone)
+                {"nome": "Marco Rossi", "ruolo": "OSS", "device_id": "OSS001_BT", "x": 120, "y": 180, "piano": 1},
+                {"nome": "Anna Verdi", "ruolo": "Infermiere", "device_id": "INF001_BT", "x": 180, "y": 160, "piano": 1},
+                {"nome": "Giuseppe Bianchi", "ruolo": "OSS", "device_id": "OSS002_BT", "x": 220, "y": 200, "piano": 1},
+                {"nome": "Laura Neri", "ruolo": "Infermiere", "device_id": "INF002_BT", "x": 160, "y": 220, "piano": 1},
+                {"nome": "Francesco Blu", "ruolo": "OSS", "device_id": "OSS003_BT", "x": 200, "y": 140, "piano": 1},
+                {"nome": "Giulia Rosa", "ruolo": "Infermiere", "device_id": "INF003_BT", "x": 140, "y": 200, "piano": 1},
+                {"nome": "Roberto Verde", "ruolo": "OSS", "device_id": "OSS004_BT", "x": 240, "y": 180, "piano": 1},
+                {"nome": "Maria Gialli", "ruolo": "Infermiere", "device_id": "INF004_BT", "x": 200, "y": 240, "piano": 1},
+                {"nome": "Paolo Viola", "ruolo": "Infermiere", "device_id": "INF005_BT", "x": 180, "y": 120, "piano": 1},
+                
+                # Piano 2 - Reparti Specialistici (9 persone)
+                {"nome": "Elena Arancio", "ruolo": "OSS", "device_id": "OSS005_BT", "x": 150, "y": 280, "piano": 2},
+                {"nome": "Luca Marrone", "ruolo": "Infermiere", "device_id": "INF006_BT", "x": 200, "y": 260, "piano": 2},
+                {"nome": "Sara Grigio", "ruolo": "OSS", "device_id": "OSS006_BT", "x": 180, "y": 300, "piano": 2},
+                {"nome": "Andrea Nero", "ruolo": "Infermiere", "device_id": "INF007_BT", "x": 220, "y": 280, "piano": 2},
+                {"nome": "Chiara Celeste", "ruolo": "OSS", "device_id": "OSS007_BT", "x": 160, "y": 320, "piano": 2},
+                {"nome": "Matteo Oro", "ruolo": "Infermiere", "device_id": "INF008_BT", "x": 240, "y": 300, "piano": 2},
+                {"nome": "Federica Argento", "ruolo": "OSS", "device_id": "OSS008_BT", "x": 140, "y": 260, "piano": 2},
+                {"nome": "Davide Bronzo", "ruolo": "Infermiere", "device_id": "INF009_BT", "x": 200, "y": 320, "piano": 2},
+                {"nome": "Valentina Rame", "ruolo": "Infermiere", "device_id": "INF010_BT", "x": 180, "y": 240, "piano": 2},
+                
+                # Piano 3 - Pediatria/Maternità (9 persone)
+                {"nome": "Simone Perla", "ruolo": "OSS", "device_id": "OSS009_BT", "x": 170, "y": 380, "piano": 3},
+                {"nome": "Alessia Corallo", "ruolo": "Infermiere", "device_id": "INF011_BT", "x": 210, "y": 360, "piano": 3},
+                {"nome": "Nicola Turchese", "ruolo": "OSS", "device_id": "OSS010_BT", "x": 190, "y": 400, "piano": 3},
+                {"nome": "Francesca Smeraldo", "ruolo": "Infermiere", "device_id": "INF012_BT", "x": 230, "y": 380, "piano": 3},
+                {"nome": "Antonio Rubino", "ruolo": "OSS", "device_id": "OSS011_BT", "x": 150, "y": 360, "piano": 3},
+                {"nome": "Silvia Zaffiro", "ruolo": "Infermiere", "device_id": "INF013_BT", "x": 250, "y": 400, "piano": 3},
+                {"nome": "Emanuele Diamante", "ruolo": "OSS", "device_id": "OSS012_BT", "x": 170, "y": 420, "piano": 3},
+                {"nome": "Cristina Topazio", "ruolo": "Infermiere", "device_id": "INF014_BT", "x": 210, "y": 340, "piano": 3},
+                {"nome": "Michele Opale", "ruolo": "Infermiere", "device_id": "INF015_BT", "x": 190, "y": 360, "piano": 3}
+            ]
             
-            # Piano 3 - Pediatria/Maternità (9 persone)
-            {"nome": "Simone Perla", "ruolo": "OSS", "device_id": "OSS009_BT", "x": 170, "y": 380, "piano": 3},
-            {"nome": "Alessia Corallo", "ruolo": "Infermiere", "device_id": "INF011_BT", "x": 210, "y": 360, "piano": 3},
-            {"nome": "Nicola Turchese", "ruolo": "OSS", "device_id": "OSS010_BT", "x": 190, "y": 400, "piano": 3},
-            {"nome": "Francesca Smeraldo", "ruolo": "Infermiere", "device_id": "INF012_BT", "x": 230, "y": 380, "piano": 3},
-            {"nome": "Antonio Rubino", "ruolo": "OSS", "device_id": "OSS011_BT", "x": 150, "y": 360, "piano": 3},
-            {"nome": "Silvia Zaffiro", "ruolo": "Infermiere", "device_id": "INF013_BT", "x": 250, "y": 400, "piano": 3},
-            {"nome": "Emanuele Diamante", "ruolo": "OSS", "device_id": "OSS012_BT", "x": 170, "y": 420, "piano": 3},
-            {"nome": "Cristina Topazio", "ruolo": "Infermiere", "device_id": "INF014_BT", "x": 210, "y": 340, "piano": 3},
-            {"nome": "Michele Opale", "ruolo": "Infermiere", "device_id": "INF015_BT", "x": 190, "y": 360, "piano": 3}
-        ]
-        
-        for persona in personale_sanitario:
-            nuovo_personale = PersonaleManutenzione(
-                nome=persona["nome"],
-                ruolo=persona["ruolo"],
-                device_id=persona["device_id"],
-                disponibile=True,
-                coordinate_x=persona["x"],
-                coordinate_y=persona["y"],
-                coordinate_z=0,
-                piano=persona["piano"],
-                ultimo_aggiornamento=datetime.now()
-            )
-            db.session.add(nuovo_personale)
-        
-        try:
-            db.session.commit()
-            print(f"✅ Aggiunti {len(personale_sanitario)} membri del personale sanitario al database.")
-            print(f"📊 Distribuzione: {len([p for p in personale_sanitario if p['ruolo'] == 'OSS'])} OSS, {len([p for p in personale_sanitario if p['ruolo'] == 'Infermiere'])} Infermieri")
-            print(f"🏥 Piano 1: {len([p for p in personale_sanitario if p['piano'] == 1])} persone")
-            print(f"🏥 Piano 2: {len([p for p in personale_sanitario if p['piano'] == 2])} persone")
-            print(f"🏥 Piano 3: {len([p for p in personale_sanitario if p['piano'] == 3])} persone")
-        except Exception as e:
-            print(f"❌ Errore nel popolamento: {str(e)}")
+            for persona in personale_sanitario:
+                nuovo_personale = PersonaleManutenzione(
+                    nome=persona["nome"],
+                    ruolo=persona["ruolo"],
+                    device_id=persona["device_id"],
+                    disponibile=True,
+                    coordinate_x=persona["x"],
+                    coordinate_y=persona["y"],
+                    coordinate_z=0,
+                    piano=persona["piano"],
+                    ultimo_aggiornamento=datetime.now()
+                )
+                db.session.add(nuovo_personale)
+            
+            try:
+                db.session.commit()
+                print(f"✅ Aggiunti {len(personale_sanitario)} membri del personale sanitario al database.")
+                print(f"📊 Distribuzione: {len([p for p in personale_sanitario if p['ruolo'] == 'OSS'])} OSS, {len([p for p in personale_sanitario if p['ruolo'] == 'Infermiere'])} Infermieri")
+                print(f"🏥 Piano 1: {len([p for p in personale_sanitario if p['piano'] == 1])} persone")
+                print(f"🏥 Piano 2: {len([p for p in personale_sanitario if p['piano'] == 2])} persone")
+                print(f"🏥 Piano 3: {len([p for p in personale_sanitario if p['piano'] == 3])} persone")
+            except Exception as e:
+                print(f"❌ Errore nel popolamento: {str(e)}")
+except ImportError:
+    print("⚠️ Moduli di manutenzione non trovati, continuando senza...")
 
 # Aggiungi logging per le chiamate API
 @app.before_request
@@ -520,4 +621,10 @@ if __name__ == '__main__':
     print(f"   - POST /api/complete_cleaning")
     print(f"   - POST /api/sensor_update")
     print(f"   - POST /api/sync_notifications")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print(f"   - POST /api/init-demo")
+    
+    # Configurazione per produzione
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    
+    app.run(debug=debug, host='0.0.0.0', port=port)
