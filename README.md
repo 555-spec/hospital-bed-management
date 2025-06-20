@@ -10,7 +10,8 @@
 ## 🎯 Demo Visiva - Prova il Sistema Subito!
 
 ### 🔄 Flusso Operativo del Sistema
-```mermaid
+
+
 flowchart TD
     A[👨‍⚕️ Operatore Accede] --> B[📊 Dashboard Principale]
     B --> C{Scegli Azione}
