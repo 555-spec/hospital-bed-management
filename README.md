@@ -10,19 +10,16 @@
 ## 🎯 Demo Visiva - Prova il Sistema Subito!
 
 ### 🔄 Flusso Operativo del Sistema
+
 ```mermaid
-flowchart TD
-    A[👨‍⚕️ Operatore Accede] --> B[📊 Dashboard Principale]
-    B --> C{Scegli Azione}
-    C -->|Gestione Letti| D[🛏️ Visualizza Stato Letti]
-    C -->|Pazienti| E[👤 Gestione Pazienti]
-    C -->|Manutenzione| F[🔧 Sistema Manutenzione]
-    D --> G[📱 Notifiche Bluetooth]
-    E --> H[📋 Assegnazione Letto]
-    F --> I[⚠️ Alert Automatici]
-    G --> J[✅ Operazione Completata]
-    H --> J
-    I --> J
+graph TD
+    A[Operatore] --> B[Dashboard]
+    B --> C[Gestione Letti]
+    B --> D[Pazienti]
+    B --> E[Manutenzione]
+    C --> F[Notifiche]
+    D --> F
+    E --> F
 ### 📊 Statistiche Sistema in Tempo Reale
 
 ### 🖼️ Funzionalità Principali
